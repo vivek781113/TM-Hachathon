@@ -10,9 +10,9 @@ internal class Program
         { "Azure.Extensions.AspNetCore.Configuration.Secrets", new ApplicationInformation
         {
             ApplicationId = Guid.NewGuid(),
-            ProjectName = "Az KV Secrets",
-            ProjectType = "Azure Key Value",
-            BindingDirection = System.ComponentModel.BindingDirection.OneWay
+            ProjectName = "Az KeyVault",
+            ProjectType = "Azure Key Vault",
+            BindingDirection = nameof(BindingDirection.Inbound)
         }},
 
         { "Azure.Identity", new ApplicationInformation
@@ -20,7 +20,7 @@ internal class Program
             ApplicationId = Guid.NewGuid(),
             ProjectName = "Azure.Identity",
             ProjectType = "Idenity server",
-            BindingDirection = System.ComponentModel.BindingDirection.TwoWay
+            BindingDirection = nameof(BindingDirection.Bidirectional)
         }}
 ,
         { "Microsoft.Data.SqlClient", new ApplicationInformation
@@ -28,7 +28,7 @@ internal class Program
             ApplicationId = Guid.NewGuid(),
             ProjectName = "Persistance Layer",
             ProjectType = "Sql Server Database",
-            BindingDirection = System.ComponentModel.BindingDirection.TwoWay
+            BindingDirection = nameof(BindingDirection.Bidirectional)
         }}
     };
     private static void Main(string[] args)
@@ -133,7 +133,7 @@ internal class Program
             ApplicationId = appId,
             ProjectType = nameof(ProjectType.DotNet),
             ProjectName = solutionName,
-            AppDependencies = packages
+            //AppDependencies = packages
         });
         foreach (var ap in packages)
         {
@@ -142,9 +142,13 @@ internal class Program
                 applicationInfos.Add(new ApplicationInformation
                 {
                     ParentAppId = appId,
-                    ProjectName = solutionName +  value.ProjectName,
-                    ProjectType = solutionName + value.ProjectType,
-                    Version = ap.Version 
+                    ApplicationId = Guid.NewGuid(),
+                    ProjectName = $"{solutionName}_{value.ProjectName}",
+                    ProjectType = $"{value.ProjectType}",
+                    BindingDirection = value.BindingDirection,
+                    Version = ap.Version,
+                    DllName = ap.PackageName
+                    
                 });
             }
         }
@@ -176,9 +180,10 @@ internal class Program
                     {
                         applicationInfos.Add(new ApplicationInformation
                         {
+                            ApplicationId = Guid.NewGuid(),
                             ProjectType = nameof(ProjectType.React),
                             ProjectName = projectName,
-                            AppDependencies = ([])
+                            //AppDependencies = ([])
                         });
                     }
 

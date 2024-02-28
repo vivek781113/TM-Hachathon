@@ -5,3 +5,10 @@
     Vue,
     DotNet
 }
+
+enum BindingDirection
+{
+    Inbound,
+    Outbound,
+    Bidirectional
+}

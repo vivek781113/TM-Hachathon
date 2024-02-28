@@ -74,7 +74,7 @@ internal class Program
                     ProjectType = value.ProjectType,
                     BindingDirection = value.BindingDirection,
                     Version = ap.Version,
-                    DllName = ap.PackageName
+                    BinaryFileName = ap.PackageName
                 });
             }
         }
@@ -179,6 +179,7 @@ internal class Program
                             ApplicationId = Guid.NewGuid(),
                             ProjectType = nameof(ProjectType.React),
                             ProjectName = projectName,
+                            Version = devDependency.Value.ToString()
                         });
                     }
                 }

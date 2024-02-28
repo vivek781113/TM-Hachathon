@@ -1,0 +1,47 @@
+[
+  {
+    "ApplicationId": "1e08b9b1-3360-4107-b014-c118d57ff4ef",
+    "ProjectType": "React",
+    "ProjectName": "react-fluent",
+    "BinaryFileName": null,
+    "Version": "^17.0.41",
+    "BindingDirection": null,
+    "ParentAppId": "00000000-0000-0000-0000-000000000000"
+  },
+  {
+    "ApplicationId": "0a6c01a9-aa7b-4e83-b4cb-3d98f47d00e2",
+    "ProjectType": "DotNet",
+    "ProjectName": "Todo.Api",
+    "BinaryFileName": null,
+    "Version": null,
+    "BindingDirection": null,
+    "ParentAppId": "00000000-0000-0000-0000-000000000000"
+  },
+  {
+    "ApplicationId": "96d54225-dac8-4bc5-9b88-2bb1a2f305c7",
+    "ProjectType": "Azure Key Vault",
+    "ProjectName": "Todo.Api_Az KeyVault",
+    "BinaryFileName": "Azure.Extensions.AspNetCore.Configuration.Secrets",
+    "Version": "1.3.0",
+    "BindingDirection": "Inbound",
+    "ParentAppId": "0a6c01a9-aa7b-4e83-b4cb-3d98f47d00e2"
+  },
+  {
+    "ApplicationId": "3f5df178-7afb-45f6-9d69-25f0f64e714c",
+    "ProjectType": "Identity server",
+    "ProjectName": "Todo.Api_Azure.Identity",
+    "BinaryFileName": "Azure.Identity",
+    "Version": "1.10.4",
+    "BindingDirection": "Bidirectional",
+    "ParentAppId": "0a6c01a9-aa7b-4e83-b4cb-3d98f47d00e2"
+  },
+  {
+    "ApplicationId": "28bfded0-be50-44cc-9317-0cfa51f84a4d",
+    "ProjectType": "SQL Server Database",
+    "ProjectName": "Todo.Api_Persistence Layer",
+    "BinaryFileName": "Microsoft.Data.SqlClient",
+    "Version": "5.1.3",
+    "BindingDirection": "Bidirectional",
+    "ParentAppId": "0a6c01a9-aa7b-4e83-b4cb-3d98f47d00e2"
+  }
+]

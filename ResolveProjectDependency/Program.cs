@@ -44,7 +44,8 @@ internal class Program
                         applicationInfos.Add(new ApplicationInformation
                         {
                             ProjectType = ProjectType.React,
-                            ProjectName = projectName
+                            ProjectName = projectName,
+                            AppDependencies = ComputeCurrentPackageDependencies(packageJsonFile)
                         });
                     }
 
@@ -54,12 +55,18 @@ internal class Program
 
         return applicationInfos;
     }
+
+    private static List<ApplicationInformation> ComputeCurrentPackageDependencies(string packageJsonFile)
+    {
+        return [];
+    }
 }
 
 class ApplicationInformation
 {
     public ProjectType ProjectType { get; set; }
     public string ProjectName { get; set; }
+    public List<ApplicationInformation> AppDependencies { get; set; }
 
 }
 

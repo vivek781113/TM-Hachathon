@@ -6,7 +6,6 @@ internal class Program
 {
     static readonly Dictionary<string, ApplicationInformation> packageResourceDict = new()
     {
-
         { "Azure.Extensions.AspNetCore.Configuration.Secrets", new ApplicationInformation
         {
             ApplicationId = Guid.NewGuid(),
@@ -14,49 +13,77 @@ internal class Program
             ProjectType = "Azure Key Vault",
             BindingDirection = nameof(BindingDirection.Inbound)
         }},
-
         { "Azure.Identity", new ApplicationInformation
         {
             ApplicationId = Guid.NewGuid(),
             ProjectName = "Azure.Identity",
-            ProjectType = "Idenity server",
+            ProjectType = "Identity server",
             BindingDirection = nameof(BindingDirection.Bidirectional)
-        }}
-,
+        }},
         { "Microsoft.Data.SqlClient", new ApplicationInformation
         {
             ApplicationId = Guid.NewGuid(),
-            ProjectName = "Persistance Layer",
-            ProjectType = "Sql Server Database",
+            ProjectName = "Persistence Layer",
+            ProjectType = "SQL Server Database",
             BindingDirection = nameof(BindingDirection.Bidirectional)
         }}
     };
-    private static void Main(string[] args)
+
+    static void Main(string[] args)
     {
         var projectPath = @"C:\Users\vivektiwary\workspace\TM-Hachathon\todo-csharp-sql";
 
-        //read all the folders in projectPath & find files with .csproj extension & package.json
         var packageJsonFiles = Directory.GetFiles(projectPath, "package.json", SearchOption.AllDirectories);
-
-        // read file with .sln extension and return it's absolute path
-
         var solutionFiles = Directory.GetFiles(projectPath, "*.sln", SearchOption.AllDirectories);
 
         var packageJsonParsedResponse = ComputePackageJsonDependencies(packageJsonFiles);
-        var dotnetparsedResponse = ComputeCsProjDependencies(solutionFiles[0]);
+        var dotnetParsedResponse = ComputeCsProjDependencies(solutionFiles[0]);
 
-        packageJsonParsedResponse.AddRange(dotnetparsedResponse);
+        packageJsonParsedResponse.AddRange(dotnetParsedResponse);
 
         File.WriteAllText("output.json", JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
-
     }
-
 
     static List<ApplicationInformation> ComputeCsProjDependencies(string solutionFile)
     {
         var applicationInfos = new List<ApplicationInformation>();
         var solutionName = Path.GetFileNameWithoutExtension(solutionFile);
-        // Run dotnet restore
+
+        RunDotnetRestore(solutionFile);
+        Console.WriteLine($"Restored packages for solution: {solutionName}");
+
+        var packages = FetchPackagesFromSolution(solutionFile);
+
+        var appId = Guid.NewGuid();
+        applicationInfos.Add(new ApplicationInformation
+        {
+            ApplicationId = appId,
+            ProjectType = nameof(ProjectType.DotNet),
+            ProjectName = solutionName,
+        });
+
+        foreach (var ap in packages)
+        {
+            if (packageResourceDict.TryGetValue(ap.PackageName, out ApplicationInformation? value))
+            {
+                applicationInfos.Add(new ApplicationInformation
+                {
+                    ParentAppId = appId,
+                    ApplicationId = Guid.NewGuid(),
+                    ProjectName = $"{solutionName}_{value.ProjectName}",
+                    ProjectType = value.ProjectType,
+                    BindingDirection = value.BindingDirection,
+                    Version = ap.Version,
+                    DllName = ap.PackageName
+                });
+            }
+        }
+
+        return applicationInfos;
+    }
+
+    static void RunDotnetRestore(string solutionFile)
+    {
         var restoreProcess = new Process()
         {
             StartInfo = new ProcessStartInfo
@@ -70,12 +97,11 @@ internal class Program
         };
 
         restoreProcess.Start();
-        restoreProcess.WaitForExit(); // Wait for the restore process to complete
+        restoreProcess.WaitForExit();
+    }
 
-        Console.WriteLine($"Restored packages for solution: {solutionName}");
-
-        // write C# code to fetch all dependencies from solution file file using dotnet cli via Process class
-
+    static List<PackageInformation> FetchPackagesFromSolution(string solutionFile)
+    {
         var process = new Process()
         {
             StartInfo = new ProcessStartInfo
@@ -97,14 +123,12 @@ internal class Program
         {
             var line = process.StandardOutput.ReadLine();
 
-            // Start reading packages when the line with 'Top-level Package' is encountered
             if (!readPackages && line.Contains("Top-level Package"))
             {
                 readPackages = true;
                 continue;
             }
 
-            // Stop reading packages when an empty line is encountered
             if (readPackages && string.IsNullOrWhiteSpace(line))
             {
                 break;
@@ -112,7 +136,6 @@ internal class Program
 
             if (readPackages)
             {
-                // Extract the package name from the line
                 var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 var packageName = parts[1];
                 var version = parts[2];
@@ -125,53 +148,26 @@ internal class Program
             }
         }
 
-        //packages.RemoveWhere(x => x.StartsWith("System", StringComparison.OrdinalIgnoreCase) || x.StartsWith("Swashbuckle", StringComparison.OrdinalIgnoreCase));
-
-        var appId = Guid.NewGuid();
-        applicationInfos.Add(new ApplicationInformation
-        {
-            ApplicationId = appId,
-            ProjectType = nameof(ProjectType.DotNet),
-            ProjectName = solutionName,
-            //AppDependencies = packages
-        });
-        foreach (var ap in packages)
-        {
-            if (packageResourceDict.TryGetValue(ap.PackageName, out ApplicationInformation? value))
-            {
-                applicationInfos.Add(new ApplicationInformation
-                {
-                    ParentAppId = appId,
-                    ApplicationId = Guid.NewGuid(),
-                    ProjectName = $"{solutionName}_{value.ProjectName}",
-                    ProjectType = $"{value.ProjectType}",
-                    BindingDirection = value.BindingDirection,
-                    Version = ap.Version,
-                    DllName = ap.PackageName
-                    
-                });
-            }
-        }
-        return applicationInfos;
-
+        return packages;
     }
-
-
 
     static List<ApplicationInformation> ComputePackageJsonDependencies(string[] packageJsonFiles)
     {
         var applicationInfos = new List<ApplicationInformation>();
-        for (int i = 0; i < packageJsonFiles.Length; i++)
+
+        foreach (var packageJsonFile in packageJsonFiles)
         {
-            string? packageJsonFile = packageJsonFiles[i];
             var packageJson = File.ReadAllText(packageJsonFile);
             var packageJsonDependencies = JsonConvert.DeserializeObject<JObject>(packageJson);
             var projectName = packageJsonDependencies["name"]?.ToString();
+
             if (projectName == null)
             {
                 continue;
             }
+
             var devDependencies = packageJsonDependencies["devDependencies"];
+
             if (devDependencies != null)
             {
                 foreach (JProperty devDependency in devDependencies.Cast<JProperty>())
@@ -183,18 +179,12 @@ internal class Program
                             ApplicationId = Guid.NewGuid(),
                             ProjectType = nameof(ProjectType.React),
                             ProjectName = projectName,
-                            //AppDependencies = ([])
                         });
                     }
-
                 }
             }
         }
 
         return applicationInfos;
     }
-
-
-    //Dictionary of package to resource type
-
 }

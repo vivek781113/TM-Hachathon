@@ -1,10 +1,36 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
-using System.Linq;
 
 internal class Program
 {
+    static readonly Dictionary<string, ApplicationInformation> packageResourceDict = new()
+    {
+
+        { "Azure.Extensions.AspNetCore.Configuration.Secrets", new ApplicationInformation
+        {
+            ApplicationId = Guid.NewGuid(),
+            ProjectName = "Az KV Secrets",
+            ProjectType = "Azure Key Value",
+            BindingDirection = System.ComponentModel.BindingDirection.OneWay
+        }},
+
+        { "Azure.Identity", new ApplicationInformation
+        {
+            ApplicationId = Guid.NewGuid(),
+            ProjectName = "Azure.Identity",
+            ProjectType = "Idenity server",
+            BindingDirection = System.ComponentModel.BindingDirection.TwoWay
+        }}
+,
+        { "Microsoft.Data.SqlClient", new ApplicationInformation
+        {
+            ApplicationId = Guid.NewGuid(),
+            ProjectName = "Persistance Layer",
+            ProjectType = "Sql Server Database",
+            BindingDirection = System.ComponentModel.BindingDirection.TwoWay
+        }}
+    };
     private static void Main(string[] args)
     {
         var projectPath = @"C:\Users\vivektiwary\workspace\TM-Hachathon\todo-csharp-sql";
@@ -15,19 +41,20 @@ internal class Program
         // read file with .sln extension and return it's absolute path
 
         var solutionFiles = Directory.GetFiles(projectPath, "*.sln", SearchOption.AllDirectories);
-        
+
         var packageJsonParsedResponse = ComputePackageJsonDependencies(packageJsonFiles);
         var dotnetparsedResponse = ComputeCsProjDependencies(solutionFiles[0]);
 
-        packageJsonParsedResponse.Add(dotnetparsedResponse);
+        packageJsonParsedResponse.AddRange(dotnetparsedResponse);
 
         File.WriteAllText("output.json", JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
 
     }
 
 
-    static ApplicationInformation ComputeCsProjDependencies(string solutionFile)
+    static List<ApplicationInformation> ComputeCsProjDependencies(string solutionFile)
     {
+        var applicationInfos = new List<ApplicationInformation>();
         var solutionName = Path.GetFileNameWithoutExtension(solutionFile);
         // Run dotnet restore
         var restoreProcess = new Process()
@@ -63,7 +90,7 @@ internal class Program
 
         process.Start();
 
-        var packages = new HashSet<string>();
+        var packages = new List<PackageInformation>();
         bool readPackages = false;
 
         while (!process.StandardOutput.EndOfStream)
@@ -89,18 +116,39 @@ internal class Program
                 var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
                 var packageName = parts[1];
                 var version = parts[2];
-                packages.Add($"{packageName}, Version: {version}");
+                var packageInfo = new PackageInformation
+                {
+                    PackageName = packageName,
+                    Version = version
+                };
+                packages.Add(packageInfo);
             }
         }
 
-        packages.RemoveWhere(x => x.StartsWith("System", StringComparison.OrdinalIgnoreCase) || x.StartsWith("Swashbuckle", StringComparison.OrdinalIgnoreCase));
+        //packages.RemoveWhere(x => x.StartsWith("System", StringComparison.OrdinalIgnoreCase) || x.StartsWith("Swashbuckle", StringComparison.OrdinalIgnoreCase));
 
-        return new ApplicationInformation()
+        var appId = Guid.NewGuid();
+        applicationInfos.Add(new ApplicationInformation
         {
-            ProjectType = ProjectType.DotNet,
+            ApplicationId = appId,
+            ProjectType = nameof(ProjectType.DotNet),
             ProjectName = solutionName,
-            AppDependencies = packages.ToList()
-        };
+            AppDependencies = packages
+        });
+        foreach (var ap in packages)
+        {
+            if (packageResourceDict.TryGetValue(ap.PackageName, out ApplicationInformation? value))
+            {
+                applicationInfos.Add(new ApplicationInformation
+                {
+                    ParentAppId = appId,
+                    ProjectName = solutionName +  value.ProjectName,
+                    ProjectType = solutionName + value.ProjectType,
+                    Version = ap.Version 
+                });
+            }
+        }
+        return applicationInfos;
 
     }
 
@@ -128,9 +176,9 @@ internal class Program
                     {
                         applicationInfos.Add(new ApplicationInformation
                         {
-                            ProjectType = ProjectType.React,
+                            ProjectType = nameof(ProjectType.React),
                             ProjectName = projectName,
-                            //AppDependencies = ComputeCurrentPackageDependencies(packageJsonFile)
+                            AppDependencies = ([])
                         });
                     }
 
@@ -141,25 +189,7 @@ internal class Program
         return applicationInfos;
     }
 
-    private static List<ApplicationInformation> ComputeCurrentPackageDependencies(string packageJsonFile)
-    {
-        return [];
-    }
-}
 
-class ApplicationInformation
-{
-    public ProjectType ProjectType { get; set; }
-    public string ProjectName { get; set; }
-    public List<string> AppDependencies { get; set; }
+    //Dictionary of package to resource type
 
-}
-
-
-enum ProjectType
-{
-    React,
-    Angular,
-    Vue,
-    DotNet
 }

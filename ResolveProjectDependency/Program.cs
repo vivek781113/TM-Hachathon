@@ -20,6 +20,14 @@ internal class Program
             ProjectType = "Identity server",
             BindingDirection = nameof(BindingDirection.Bidirectional)
         }},
+        {
+            "Microsoft.ApplicationInsights.AspNetCore", new ApplicationInformation
+            {
+                ApplicationId = Guid.NewGuid(),
+                ProjectName = "AppInsights",
+                ProjectType = "Application Insights",
+                BindingDirection = nameof(BindingDirection.Outbound)
+            } },
         { "Microsoft.Data.SqlClient", new ApplicationInformation
         {
             ApplicationId = Guid.NewGuid(),
@@ -60,6 +68,8 @@ internal class Program
             ApplicationId = appId,
             ProjectType = nameof(ProjectType.DotNet),
             ProjectName = solutionName,
+            Version = "8.0",
+            BinaryFileName = ".net"
         });
 
         foreach (var ap in packages)

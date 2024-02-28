@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
+using System.Linq;
 
 internal class Program
 {
@@ -14,20 +15,14 @@ internal class Program
         // read file with .sln extension and return it's absolute path
 
         var solutionFiles = Directory.GetFiles(projectPath, "*.sln", SearchOption.AllDirectories);
-        if (solutionFiles.Length > 0)
-        {
-            var solutionFile = solutionFiles[0];
-            ApplicationInformation projectDependecies = ComputeCsProjDependencies(solutionFile);
-            string json = JsonConvert.SerializeObject(projectDependecies);
-            Console.WriteLine(json);
-        }
-        else
-        {
-            Console.WriteLine("No solution file found.");
-        }
+        
+        var packageJsonParsedResponse = ComputePackageJsonDependencies(packageJsonFiles);
+        var dotnetparsedResponse = ComputeCsProjDependencies(solutionFiles[0]);
 
+        packageJsonParsedResponse.Add(dotnetparsedResponse);
 
-        ComputePackageJsonDependencies(packageJsonFiles);
+        File.WriteAllText("output.json", JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
+
     }
 
 

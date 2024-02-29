@@ -1,5 +1,5 @@
-﻿using System.Diagnostics;
-
+﻿using System.Collections.Concurrent;
+using System.Xml.Linq;
 namespace ResolveProjectDependency.Resolvers;
 
 public class DotnetResolver
@@ -39,113 +39,109 @@ public class DotnetResolver
 
     public static List<ApplicationInformation> ComputeCsProjDependencies(string projectPath)
     {
-        var solutionFile = Directory.GetFiles(projectPath, "*.sln", SearchOption.AllDirectories)[0];
-        
         var applicationInfos = new List<ApplicationInformation>();
-        var solutionName = Path.GetFileNameWithoutExtension(solutionFile);
+        var csprojFiles = Directory.GetFiles(projectPath, "*.csproj", SearchOption.AllDirectories);
 
-        RunDotnetRestore(solutionFile);
-        Console.WriteLine($"Restored packages for solution: {solutionName}");
-
-        var packages = FetchPackagesFromSolution(solutionFile);
-
-        var appId = Guid.NewGuid();
-        applicationInfos.Add(new ApplicationInformation
+        foreach (var csprojFile in csprojFiles)
         {
-            ApplicationId = appId,
-            ProjectType = nameof(ProjectType.DotNet),
-            ProjectName = solutionName,
-            Version = "8.0",
-            BinaryFileName = ".net"
-        });
+            var projectName = Path.GetFileNameWithoutExtension(csprojFile);
 
-        foreach (var ap in packages)
-        {
-            if (packageResourceDict.TryGetValue(ap.PackageName, out ApplicationInformation? value))
+            var (targetFramework, project, packages) = FetchPackagesFromSolution(csprojFile);
+            var appId = Guid.NewGuid();
+            applicationInfos.Add(new ApplicationInformation
             {
-                applicationInfos.Add(new ApplicationInformation
+                ApplicationId = appId,
+                ProjectType = project,
+                ProjectName = projectName,
+                Version = targetFramework,
+                BinaryFileName = ".net"
+            });
+
+            foreach (var ap in packages)
+            {
+                if (packageResourceDict.TryGetValue(ap.PackageName, out ApplicationInformation? value))
                 {
-                    ParentAppId = appId,
-                    ApplicationId = Guid.NewGuid(),
-                    ProjectName = $"{solutionName}_{value.ProjectName}",
-                    ProjectType = value.ProjectType,
-                    BindingDirection = value.BindingDirection,
-                    Version = ap.Version,
-                    BinaryFileName = ap.PackageName
-                });
+                    applicationInfos.Add(new ApplicationInformation
+                    {
+                        ParentAppId = appId,
+                        ApplicationId = Guid.NewGuid(),
+                        ProjectName = $"{projectName}_{value.ProjectName}",
+                        ProjectType = value.ProjectType,
+                        BindingDirection = value.BindingDirection,
+                        Version = ap.Version,
+                        BinaryFileName = ap.PackageName
+                    });
+                }
             }
         }
+
+
+
 
         return applicationInfos;
     }
 
-    static void RunDotnetRestore(string solutionFile)
+    static (string, string, List<PackageInformation>) FetchPackagesFromSolution(string csprojFile)
     {
-        var restoreProcess = new Process()
+        var packages = new ConcurrentBag<PackageInformation>();
+        string targetFramework = string.Empty;
+        string project = string.Empty;
+        var xDocument = XDocument.Load(csprojFile);
+        var projectNode = xDocument.Root;
+        if (projectNode != null)
         {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = $"restore {solutionFile}",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            }
-        };
+            XNamespace ns = projectNode.GetDefaultNamespace();
+            var sdk = projectNode.Attribute("Sdk")?.Value;
 
-        restoreProcess.Start();
-        restoreProcess.WaitForExit();
+            var outputType = projectNode.Descendants(ns + "OutputType").FirstOrDefault()?.Value;
+            if (outputType != null)
+            {
+            }
+
+            var framework = projectNode.Descendants(ns + "TargetFramework").FirstOrDefault()?.Value;
+            if (framework != null)
+            {
+                targetFramework = framework;
+            }
+
+            if (sdk == "Microsoft.NET.Sdk.Web")
+            {
+                project = nameof(DotNetProjectType.Web);
+            }
+            else if (outputType == "Exe")
+            {
+                project = nameof(DotNetProjectType.Console);
+            }
+            else if (outputType == "Library")
+            {
+                project = nameof(DotNetProjectType.Library);
+            }
+
+        }
+        var packageReferences = xDocument.Descendants()
+            .Where(d => d.Name.LocalName == "PackageReference");
+
+        Parallel.ForEach(packageReferences, packageReference =>
+        {
+            if (packageReference.Attributes("Include").FirstOrDefault() is XAttribute includeAttribute &&
+                packageReference.Attributes("Version").FirstOrDefault() is XAttribute versionAttribute)
+            {
+                packages.Add(new PackageInformation
+                {
+                    PackageName = includeAttribute.Value,
+                    Version = versionAttribute.Value
+                });
+            }
+        });
+
+        return (targetFramework, project, packages.ToList());
     }
 
-    static List<PackageInformation> FetchPackagesFromSolution(string solutionFile)
+    private enum DotNetProjectType
     {
-        var process = new Process()
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "dotnet",
-                Arguments = $"list {solutionFile} package",
-                RedirectStandardOutput = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            }
-        };
-
-        process.Start();
-
-        var packages = new List<PackageInformation>();
-        bool readPackages = false;
-
-        while (!process.StandardOutput.EndOfStream)
-        {
-            var line = process.StandardOutput.ReadLine();
-
-            if (!readPackages && line.Contains("Top-level Package"))
-            {
-                readPackages = true;
-                continue;
-            }
-
-            if (readPackages && string.IsNullOrWhiteSpace(line))
-            {
-                break;
-            }
-
-            if (readPackages)
-            {
-                var parts = line.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
-                var packageName = parts[1];
-                var version = parts[2];
-                var packageInfo = new PackageInformation
-                {
-                    PackageName = packageName,
-                    Version = version
-                };
-                packages.Add(packageInfo);
-            }
-        }
-
-        return packages;
+        Web,
+        Console,
+        Library
     }
 
 }

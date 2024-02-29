@@ -28,11 +28,13 @@ This project aims to demonstrate resource interaction using dotnet CLI and Node.
 
 ## Run the project
 
-To run the project, navigate to the directory where the `.csproj` file is located and execute the following command:
+To run the project, navigate to the  **ResolveProjectDependency** directory where the `.csproj` file is located and execute the following command:
 
     ```
-    dotnet run --c Release -v q "https://github.com/Azure-Samples/todo-csharp-sql"
+    dotnet run -v q "https://github.com/Azure-Samples/todo-csharp-sql"
+
     ```
+
 
 ## Usage
 

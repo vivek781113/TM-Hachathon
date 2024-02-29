@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using ResolveProjectDependency.Resolvers;
 using ResolveProjectDependency.Utils;
 using System.Diagnostics;
@@ -12,13 +11,24 @@ internal class Program
             Console.Error.WriteLine("Please install the required tools [dotnet cli, git, node] and try again.");
 
         var projectPath = args.Length == 0 ? CloneGitRepo() : CloneGitRepo(args[0]);
-  
+
         var packageJsonParsedResponse = NodeResolver.ComputePackageJsonDependencies(projectPath);
         var dotnetParsedResponse = DotnetResolver.ComputeCsProjDependencies(projectPath);
 
         packageJsonParsedResponse.AddRange(dotnetParsedResponse);
+        
+        ProduceOutput(packageJsonParsedResponse);
 
-        File.WriteAllText("output.json", JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
+        //TODO
+        // DeleteTempDirectory(projectPath);
+    }
+
+    private static void ProduceOutput(List<ApplicationInformation> packageJsonParsedResponse)
+    {
+        string currentDirectory = Directory.GetCurrentDirectory();
+        var filePath = Path.Combine(currentDirectory, $"{DateTime.Now.Ticks}_output.json");
+        File.WriteAllText(filePath, JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
+        Console.WriteLine($"output file is at: {filePath}");
     }
 
 
@@ -40,9 +50,14 @@ internal class Program
 
         process.Start();
         process.WaitForExit();
+        Console.WriteLine(tempDirectory);
         return tempDirectory;
     }
 
-
+    //delete temp directory after use
+    static void DeleteTempDirectory(string tempDirectory)
+    {
+        Directory.Delete(tempDirectory, true);
+    }
 
 }

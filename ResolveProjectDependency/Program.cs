@@ -1,80 +1,48 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using ResolveProjectDependency.Resolvers;
+using ResolveProjectDependency.Utils;
+using System.Diagnostics;
 
 internal class Program
 {
-    private static void Main(string[] args)
+    static void Main(string[] args)
     {
-        var projectPath = @"C:\Users\vivektiwary\workspace\TM-Hachathon\todo-csharp-sql";
+        if (!AppValidations.InitValidation())
+            Console.Error.WriteLine("Please install the required tools [dotnet cli, git, node] and try again.");
 
-        //read all the folders in projectPath & find files with .csproj extension & package.json
-        var projectFiles = Directory.GetFiles(projectPath, "*.csproj", SearchOption.AllDirectories);
-        var packageJsonFiles = Directory.GetFiles(projectPath, "package.json", SearchOption.AllDirectories);
+        var projectPath = args.Length == 0 ? CloneGitRepo() : CloneGitRepo(args[0]);
+  
+        var packageJsonParsedResponse = NodeResolver.ComputePackageJsonDependencies(projectPath);
+        var dotnetParsedResponse = DotnetResolver.ComputeCsProjDependencies(projectPath);
 
-        ComputePackageJsonDependencies(packageJsonFiles);
+        packageJsonParsedResponse.AddRange(dotnetParsedResponse);
+
+        File.WriteAllText("output.json", JsonConvert.SerializeObject(packageJsonParsedResponse, Formatting.Indented));
     }
 
 
-    static void ComputeCsProjDependencies(string[] projectFiles)
+    //method to clone git repo & keep in temp directory & return the path
+    static string CloneGitRepo(string repoUrl = "https://github.com/Azure-Samples/todo-csharp-sql")
     {
-
-    }
-
-
-    static List<ApplicationInformation> ComputePackageJsonDependencies(string[] packageJsonFiles)
-    {
-        var applicationInfos = new List<ApplicationInformation>();
-        for (int i = 0; i < packageJsonFiles.Length; i++)
+        var tempDirectory = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var process = new Process()
         {
-            string? packageJsonFile = packageJsonFiles[i];
-            var packageJson = File.ReadAllText(packageJsonFile);
-            var packageJsonDependencies = JsonConvert.DeserializeObject<JObject>(packageJson);
-            var projectName = packageJsonDependencies["name"]?.ToString();
-            if (projectName == null)
+            StartInfo = new ProcessStartInfo
             {
-                continue;
+                FileName = "git",
+                Arguments = $"clone {repoUrl} {tempDirectory}",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
             }
-            var devDependencies = packageJsonDependencies["devDependencies"];
-            if (devDependencies != null)
-            {
-                foreach (JProperty devDependency in devDependencies.Cast<JProperty>())
-                {
-                    if (string.Equals(devDependency.Name, "@types/react", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        applicationInfos.Add(new ApplicationInformation
-                        {
-                            ProjectType = ProjectType.React,
-                            ProjectName = projectName,
-                            AppDependencies = ComputeCurrentPackageDependencies(packageJsonFile)
-                        });
-                    }
+        };
 
-                }
-            }
-        }
-
-        return applicationInfos;
+        process.Start();
+        process.WaitForExit();
+        return tempDirectory;
     }
 
-    private static List<ApplicationInformation> ComputeCurrentPackageDependencies(string packageJsonFile)
-    {
-        return [];
-    }
-}
-
-class ApplicationInformation
-{
-    public ProjectType ProjectType { get; set; }
-    public string ProjectName { get; set; }
-    public List<ApplicationInformation> AppDependencies { get; set; }
-
-}
 
 
-enum ProjectType
-{
-    React,
-    Angular,
-    Vue,
-    DotNet
 }
